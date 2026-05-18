@@ -12,13 +12,13 @@ jobs:
       # ─────────────────────────────
       # TOOLCHAIN
       # ─────────────────────────────
-      - name: Install devkitPro
+      - name: Install devkitPro (stable)
         run: |
-          set -e
-          curl -fL https://apt.devkitpro.org/install-devkitpro-pacman -o install.sh
-          head -n 5 install.sh
-          sudo bash install.sh
-
+          sudo apt update
+          sudo apt install -y wget ca-certificates gnupg
+          wget https://apt.devkitpro.org/install-devkitpro-pacman
+          chmod +x install-devkitpro-pacman
+          sudo ./install-devkitpro-pacman
       # ─────────────────────────────
       # INLINE PROJECT + CHEATS
       # ─────────────────────────────
