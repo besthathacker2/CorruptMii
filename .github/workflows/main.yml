@@ -12,13 +12,19 @@ jobs:
       # ─────────────────────────────
       # TOOLCHAIN
       # ─────────────────────────────
-      - name: Install devkitPro (stable)
+      - name: Install devkitPro
         run: |
-          sudo apt update
-          sudo apt install -y wget ca-certificates gnupg
-          wget https://apt.devkitpro.org/install-devkitpro-pacman
-          chmod +x install-devkitpro-pacman
-          sudo ./install-devkitpro-pacman
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y wget ca-certificates gnupg apt-transport-https
+
+          sudo mkdir -p /usr/share/keyrings
+          wget -q -O /usr/share/keyrings/devkitpro-pub.gpg https://apt.devkitpro.org/devkitpro-pub.gpg
+
+          echo "deb [signed-by=/usr/share/keyrings/devkitpro-pub.gpg] https://apt.devkitpro.org stable main" | sudo tee /etc/apt/sources.list.d/devkitpro.list
+
+          sudo apt-get update
+          sudo apt-get install -y devkitpro-pacman
       # ─────────────────────────────
       # INLINE PROJECT + CHEATS
       # ─────────────────────────────
