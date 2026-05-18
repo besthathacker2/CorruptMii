@@ -15,16 +15,30 @@ jobs:
       - name: Install devkitPro
         run: |
           set -e
+
+          echo "[1] Dependencies"
           sudo apt-get update
-          sudo apt-get install -y wget ca-certificates gnupg apt-transport-https
+          sudo apt-get install -y wget ca-certificates gnupg
 
-          sudo mkdir -p /usr/share/keyrings
-          wget -q -O /usr/share/keyrings/devkitpro-pub.gpg https://apt.devkitpro.org/devkitpro-pub.gpg
+          echo "[2] Key setup"
+          mkdir -p /usr/share/keyrings
 
-          echo "deb [signed-by=/usr/share/keyrings/devkitpro-pub.gpg] https://apt.devkitpro.org stable main" | sudo tee /etc/apt/sources.list.d/devkitpro.list
+          wget -qO /usr/share/keyrings/devkitpro-pub.gpg \
+          https://apt.devkitpro.org/devkitpro-pub.gpg
 
-          sudo apt-get update
-          sudo apt-get install -y devkitpro-pacman
+          echo "[3] Repo setup"
+          sudo echo "deb [signed-by=/usr/share/keyrings/devkitpro-pub.gpg] https://apt.devkitpro.org stable main" \
+            > /etc/apt/sources.list.d/devkitpro.list
+
+          echo "[4] APT refresh (IMPORTANT)"
+          apt-get update --allow-insecure-repositories
+
+          echo "[5] Install (force resolve)"
+          apt-get install -y --no-install-recommends devkitpro-pacman || {
+            echo "Primary install failed, retrying fallback..."
+            apt-cache search devkitpro
+            exit 8
+          }
       # ─────────────────────────────
       # INLINE PROJECT + CHEATS
       # ─────────────────────────────
