@@ -1,0 +1,182 @@
+name: Wii Full Cheat Pipeline (Inline)
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ─────────────────────────────
+      # TOOLCHAIN
+      # ─────────────────────────────
+      - name: Install devkitPro
+        run: |
+          sudo apt update
+          sudo apt install -y curl git zip build-essential
+
+          curl -L https://apt.devkitpro.org/install-devkitpro-pacman | sudo bash
+          sudo dkp-pacman -Syu --noconfirm
+          sudo dkp-pacman -S --noconfirm wii-dev
+
+      # ─────────────────────────────
+      # INLINE PROJECT + CHEATS
+      # ─────────────────────────────
+      - name: Create full inline system
+        run: |
+          mkdir -p project/source sd/codes
+
+          # =========================
+          # Wii Homebrew (minimal UI)
+          # =========================
+          cat > project/source/main.c << 'EOF'
+          #include <gccore.h>
+          #include <wiiuse/wpad.h>
+          #include <fat.h>
+          #include <stdio.h>
+
+          int main() {
+              VIDEO_Init();
+              WPAD_Init();
+              fatInitDefault();
+
+              printf("CHEAT PIPELINE ACTIVE\n");
+
+              while(1) {
+                  WPAD_ScanPads();
+                  u32 b = WPAD_ButtonsDown(0);
+
+                  if (b & WPAD_BUTTON_A)
+                      printf("BUILD READY\n");
+
+                  if (b & WPAD_BUTTON_HOME)
+                      break;
+              }
+              return 0;
+          }
+          EOF
+
+          # =========================
+          # GCT BUILDER (INLINE TOOL)
+          # =========================
+          cat > project/source/gct_tool.c << 'EOF'
+          #include <stdio.h>
+          #include <string.h>
+
+          unsigned int buf[4096];
+          int c = 0;
+
+          void add(unsigned int v){ buf[c++] = v; }
+
+          int main(){
+              FILE* in = fopen("cheats.txt","r");
+              FILE* out = fopen("out.gct","wb");
+
+              unsigned int header = 0x00D0C0DE;
+              fwrite(&header,4,1,out);
+
+              char line[256];
+              unsigned int a,b;
+
+              while(fgets(line,sizeof(line),in)){
+                  if(line[0]=='#' || strlen(line)<4) continue;
+
+                  // Cheat Manager format:
+                  // "XXXXXXXX YYYYYYYY"
+                  if(sscanf(line,"%x %x",&a,&b)>=1){
+                      add(a);   // ONLY first column is used
+                  }
+              }
+
+              for(int i=0;i<c;i++)
+                  fwrite(&buf[i],4,1,out);
+
+              unsigned int end = 0xF0000000;
+              fwrite(&end,4,1,out);
+
+              fclose(in);
+              fclose(out);
+              return 0;
+          }
+          EOF
+
+          # =========================
+          # MAKEFILE
+          # =========================
+          cat > project/Makefile << 'EOF'
+          TARGET = boot
+          BUILD = build
+          SOURCE = source
+
+          CFILES = $(wildcard $(SOURCE)/*.c)
+
+          include $(DEVKITPPC)/wii_rules
+          EOF
+
+          # =========================
+          # INLINE CHEAT FILE (FULL)
+          # =========================
+          cat > cheats.txt << 'EOF'
+          C2250A9C 00000010
+          3C608000 00000000
+          806300F8 00000000
+          2C030002 00000000
+          40820048 00000000
+          2C240000 00000000
+          41820040 00000000
+          80D8000C 00000000
+          C0E2A000 00000000
+          EC003828 00000000
+          D01A000C 00000000
+          80D8001C 00000000
+          C0E2A000 00000000
+          EC001828 00000000
+          D01A001C 00000000
+          80D8002C 00000000
+          C0E2A000 00000000
+          EC000828 00000000
+          D01A002C 00000000
+          EOF
+
+      # ─────────────────────────────
+      # BUILD WII HOMEBREW
+      # ─────────────────────────────
+      - name: Build Wii app
+        run: |
+          cd project
+          make
+
+      # ─────────────────────────────
+      # BUILD CHEAT TOOL
+      # ─────────────────────────────
+      - name: Compile GCT tool
+        run: |
+          gcc project/source/gct_tool.c -o gct_tool
+
+      # ─────────────────────────────
+      # GENERATE GCT FROM INLINE CHEATS
+      # ─────────────────────────────
+      - name: Build GCT
+        run: |
+          ./gct_tool
+          mkdir -p sd/codes
+          mv out.gct sd/codes/game.gct
+
+      # ─────────────────────────────
+      # PACKAGE SD STRUCTURE
+      # ─────────────────────────────
+      - name: Package SD card
+        run: |
+          cp project/boot.dol sd/
+          zip -r wii_full_cheat_package.zip sd
+
+      # ─────────────────────────────
+      # UPLOAD ARTIFACT
+      # ─────────────────────────────
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: wii-cheat-system
+          path: wii_full_cheat_package.zip
