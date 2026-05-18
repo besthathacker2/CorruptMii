@@ -14,12 +14,10 @@ jobs:
       # ─────────────────────────────
       - name: Install devkitPro
         run: |
-          sudo apt update
-          sudo apt install -y curl git zip build-essential
-
-          curl -L https://apt.devkitpro.org/install-devkitpro-pacman | sudo bash
-          sudo dkp-pacman -Syu --noconfirm
-          sudo dkp-pacman -S --noconfirm wii-dev
+          set -e
+          curl -fL https://apt.devkitpro.org/install-devkitpro-pacman -o install.sh
+          head -n 5 install.sh
+          sudo bash install.sh
 
       # ─────────────────────────────
       # INLINE PROJECT + CHEATS
